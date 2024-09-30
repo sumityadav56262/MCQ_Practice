@@ -31,16 +31,20 @@
             </div>
             <div>
                 <label>
-                    <input type="checkbox" id="show-feedback" checked>
-                    Wanna know the correct and wrong options
+                    <input type="checkbox" id="show-feedback" >
+                    Wanna know the correct and wrong option
                 </label>
             </div>
             <div id="result" style="display: none;">
                 <h2>Results</h2>
                 <p id="result-percentage"></p>
-                <button id="practice-again" onclick="startNewPractice()" style="display: none;">Practice Again</button>
+                <details id="more-detail">
+                    <summary>Show details</summary>
+                    <p><div id="detailed-results"></div></p>
+                  </details>
+                <button id="practice-again" class="btn" onclick="startNewPractice()" style="display: none;">Practice Again</button>
             </div>
-            <button id="nextBtn" disabled onclick="nextQuestion()">Next</button>
+            <button id="nextBtn" class="btn" disabled onclick="nextQuestion()">Next</button>
         </div>
     </div>
 
@@ -48,9 +52,14 @@
         let questions = []; // Store questions
         let currentQuestionIndex = 0;
         let correctAnswers = 0;
+        let isCkecked = false;
         let totalQuestions = 30; // Set to 30
-        let showFeedback = true;
+        let showFeedback = false;
         let timer;
+
+        // New array to store the user's selected answers
+        let userAnswers = [];
+
         // Fetch a set of 30 questions when the page loads
         window.onload = () => {
             fetchQuestions();
@@ -107,40 +116,59 @@
                     optionDiv.value = option;
                     optionDiv.classList.add('option');
                     optionDiv.dataset.index = i; // Store the index for comparison
-                    optionDiv.onclick = () => checkAnswer(optionDiv, correctAnswer, i); // Pass the index of the clicked option
+                    optionDiv.onclick = () => checkAnswer(optionDiv, correctAnswer, question); // Pass the index of the clicked option
                     optionsContainer.appendChild(optionDiv);
                 });
 
                 document.getElementById('current-question').textContent = index + 1;
-
+                isCkecked = false;
                 // Remove fade-out effect
                 questionContainer.classList.remove('fade-out');
                 questionContainer.style.opacity = 1; // Ensure it’s fully visible
-            }, 500); // Match this duration with the CSS transition duration
+            }, 300); // Match this duration with the CSS transition duration
         }
 
+        function checkAnswer(optionDiv, correctAnswer, currentQuestion) {
+            if(isCkecked)
+            {
+                return;
+            }
+            isCkecked = true;
+            // Save the selected answer to userAnswers array
+            const userSelectedAnswer = optionDiv.textContent;
+            userAnswers[currentQuestionIndex] = {
+                question: currentQuestion,
+                selected: userSelectedAnswer,
+                correct: correctAnswer
+            };
 
-
-        function checkAnswer(optionDiv, correctAnswer, selectedAnswer) {
             // Highlight the selected answer
-            if (optionDiv.textContent === correctAnswer) {
+            if (userSelectedAnswer === correctAnswer) {
                 correctAnswers++;
-                optionDiv.classList.add('correct');
+                if(showFeedback)
+                    optionDiv.classList.add('correct');
             } else {
-                optionDiv.classList.add('wrong');
                 const optionElements = document.querySelectorAll('.option');
-                
                 optionElements.forEach((option) => {
                     if (option.textContent.trim() === correctAnswer) {
-                        // Highlight the correct answer
-                        const correctOptionDiv = option;
-                        if (correctOptionDiv && showFeedback) {
-                            correctOptionDiv.classList.add('correct');
+                        if (showFeedback) {
+                            optionDiv.classList.add('wrong');
+                            option.classList.add('correct');
                         }
                     }
                 });
             }
-            document.getElementById('nextBtn').disabled = false; // Enable next button only after an answer is selected
+            if(!showFeedback)
+            {
+                setTimeout(()=>{
+                    currentQuestionIndex++;
+                    loadQuestion(currentQuestionIndex);
+                    document.getElementById('nextBtn').disabled = true;
+                },300);
+            }
+            else
+                document.getElementById('nextBtn').disabled = false; // Enable next button only after an answer is selected
+                document.getElementById('mcq-container').disabled = true; // Enable next button only after an answer is selected
         }
 
         function nextQuestion() {
@@ -174,10 +202,30 @@
         function showResults() {
             clearInterval(timer); // Stop the timer
             document.getElementById('mcq-container').style.display = 'none';
+            document.getElementById('nextBtn').style.display = 'none';
+            document.getElementById('show-feedback').style.display = 'none';
             document.getElementById('result').style.display = 'block';
             const percentage = (correctAnswers / totalQuestions) * 100;
             document.getElementById('result-percentage').textContent = `You got ${correctAnswers} out of ${totalQuestions} correct (${percentage.toFixed(2)}%)`;
             document.getElementById('practice-again').style.display = 'inline-block'; // Show practice again button
+
+            // Show detailed results with selected and correct answers
+            const detailedResultsContainer = document.getElementById('detailed-results');
+            detailedResultsContainer.innerHTML = ''; // Clear previous results
+
+            userAnswers.forEach((answer, index) => {
+                const resultDiv = document.createElement('div');
+                resultDiv.innerHTML = `
+                    <p><strong>Question ${index + 1}: ${answer.question}</strong></p>
+                    ${answer.selected !== answer.correct ? `<p style='color:rgb(250,100,100);'>Your answer: ${answer.selected}</p>
+                    <p style='color:rgb(100,250,100);'>Correct answer: <b>${answer.correct}</b></p>` : `<p>Correct answer: ${answer.correct}</p>`}
+                    
+                `;
+                if(answer.selected == answer.correct )
+                    resultDiv.get = "rgb(0,255,0)";
+                detailedResultsContainer.appendChild(resultDiv);
+            });
+
         }
 
         function startNewPractice() {

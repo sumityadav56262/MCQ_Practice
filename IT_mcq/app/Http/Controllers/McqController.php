@@ -22,7 +22,11 @@ class McqController extends Controller
             'options' => 'required|array',
             'correct_answer' => 'required|integer',
         ]);
-
+        $existing = Mcq::where('question',$validated['question']);
+        if($existing)
+        {
+            return redirect()->route('admin.mcq')->with('success', 'The Question is already added!');
+        }
         Mcq::create([
             'question' => $validated['question'],
             'options' => json_encode($validated['options']),
@@ -60,7 +64,6 @@ class McqController extends Controller
 
         return view('user', compact('questions')); // Pass to view
     }
-
 
     // Validate the user's answer
     public function validateAnswer(Request $request)
