@@ -9,13 +9,11 @@
 </head>
 <body>
     <div class="container">
-        <!-- Rounded switch -->
+        <div class="wrapper">
             <label id="toggleBtn" class="switch">
                 <input  type="checkbox" id="toggleSwitch">
                 <span class="slider round"></span>
             </label>
-                       
-        <div class="wrapper">
             <div class="nav">
                 <h1>MCQ Practice</h1>
                 <div class="timer" id="timer">
@@ -26,7 +24,7 @@
                 <div id="question-container">
                     <p id="question"></p>
                     <div id="options"></div>
-                    <div id="question-number">
+                    <div id="question-number" style="margin: 10px 0">
                         Question: <span id="current-question">1</span> of <span id="total-questions">30</span>
                     </div>
                 </div>
@@ -136,7 +134,7 @@
                     if (option.textContent.trim() === correctAnswer) {
                         // Highlight the correct answer
                         const correctOptionDiv = option;
-                        if (correctOptionDiv) {
+                        if (correctOptionDiv && showFeedback) {
                             correctOptionDiv.classList.add('correct');
                         }
                     }

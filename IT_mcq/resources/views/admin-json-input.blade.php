@@ -22,7 +22,7 @@
     <form action="{{ route('admin.jsonInput.store') }}" method="POST">
         @csrf
         <label for="json_data">Paste JSON Data Here:</label><br>
-        <textarea name="json_data" required></textarea><br>
+        <textarea name="json_data" placeholder="" required></textarea><br>
         
         @error('json_data')
             <p style="color:red;">{{ $message }}</p>
@@ -30,5 +30,16 @@
 
         <button type="submit">Add Questions</button>
     </form>
+    <pre>
+Example:
+[
+    {
+        "question": "What is a motherboard?",
+        "options": ["A software", "A peripheral device", "The main circuit board of a computer", "A network component"],
+        "from":"computer_fundamental",
+        "correctAnswer": "3"
+    }
+]
+        </pre>
 </body>
 </html>
