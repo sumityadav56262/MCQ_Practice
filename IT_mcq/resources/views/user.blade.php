@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MCQ Practice</title>
     <link rel="stylesheet" href={{ asset('style/style.css') }}>
-
+    <link rel="icon" href="{{ asset('images/Mcq_logo.png') }}" type="image/x-icon">
 </head>
 <body>
     <div class="container">

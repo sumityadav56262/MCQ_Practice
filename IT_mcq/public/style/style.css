@@ -50,13 +50,13 @@ body {
 }
 
 .correct {
-    border: 2px green solid;
+    border: 2px rgb(100,255,100) solid;
     /* background-color: green; */
     color: var(--text);
 }
 
 .wrong {
-    border: red 2px solid;
+    border: rgb(255, 100, 100) 2px solid;
     color: var(--text);
 }
 
@@ -114,11 +114,15 @@ body {
     width: 26px;
     left: 4px;
     bottom: 4px;
-    background-color: white;
+    background-image: url(../images/sunIcon.JPG);
+    background-size: cover;
     -webkit-transition: .4s;
     transition: .4s;
 }
 
+input:checked+.slider::before {
+    background-image: url(../images/moonIcon.JPG);
+}
 input:checked+.slider {
     background-image: url(../images/moon.jpg);
     background-size: cover;
