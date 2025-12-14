@@ -27,7 +27,6 @@ export function QuizTaking() {
         currentQuestionIndex,
         selectedAnswers,
         attempt,
-        timeRemaining,
         setQuiz,
         setAttempt,
         selectAnswer,
@@ -45,22 +44,24 @@ export function QuizTaking() {
         setAiExplanation(null);
     }, [currentQuestionIndex]);
 
-    // ... (UseEffect for timer) ...
     // Timer effect
     useEffect(() => {
-        if (!currentQuiz || timeRemaining <= 0) {
-            if (timeRemaining === 0 && attempt) {
-                handleSubmitQuiz();
-            }
-            return;
-        }
+        if (!currentQuiz) return;
 
         const timer = setInterval(() => {
             decrementTime();
+            // Check expiry directly from store to avoid re-rendering this component
+            const remaining = useQuizStore.getState().timeRemaining;
+
+            if (remaining <= 0) {
+                clearInterval(timer);
+            }
         }, 1000);
 
         return () => clearInterval(timer);
-    }, [timeRemaining, currentQuiz, attempt]);
+    }, [currentQuiz]);
+
+
 
     const loadQuizAndStart = async () => {
         // ... (existing load logic) ...
@@ -91,8 +92,11 @@ export function QuizTaking() {
         setLoadingAi(true);
         try {
             const currentQuestion = questions[currentQuestionIndex];
+            const currentAnswers = selectedAnswers.get(currentQuestion.id);
+
             const response = await api.post('/ai/explain', {
-                question_id: currentQuestion.id
+                question_id: currentQuestion.id,
+                selected_option: currentAnswers ? currentAnswers[0] : null // Pass first selected option
             });
             setAiExplanation(response.data.explanation);
         } catch (error) {
@@ -176,6 +180,16 @@ export function QuizTaking() {
         }
     };
 
+    // Watch for time completion separately
+    useEffect(() => {
+        const unsubscribe = useQuizStore.subscribe((state) => {
+            if (state.timeRemaining === 0 && state.attempt) {
+                handleSubmitQuiz();
+            }
+        });
+        return unsubscribe;
+    }, [handleSubmitQuiz]);
+
     if (loading || !currentQuiz || !questions.length) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
@@ -220,7 +234,6 @@ export function QuizTaking() {
             <QuizProgress
                 currentQuestion={currentQuestionIndex}
                 totalQuestions={questions.length}
-                timeRemaining={timeRemaining}
             />
 
             <div className="max-w-2xl mx-auto p-4 mt-4">

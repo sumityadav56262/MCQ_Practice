@@ -12,6 +12,8 @@ import { QuizHistory } from './pages/QuizHistory';
 import { Courses } from './pages/Courses';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { BulkImport } from './pages/BulkImport';
+import { ManageQuizzes } from './pages/ManageQuizzes';
+import { QuizEditor } from './pages/QuizEditor';
 
 function App() {
   return (
@@ -38,6 +40,8 @@ function App() {
 
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/quizzes" element={<ManageQuizzes />} />
+            <Route path="/admin/quizzes/:id" element={<QuizEditor />} />
             <Route path="/admin/bulk-import" element={<BulkImport />} />
           </Routes>
         </main>

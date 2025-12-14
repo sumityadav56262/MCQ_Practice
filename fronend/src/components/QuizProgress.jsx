@@ -1,10 +1,12 @@
 import { Clock } from 'lucide-react';
+import { useQuizStore } from '../stores/quizStore';
 
 export function QuizProgress({
     currentQuestion,
-    totalQuestions,
-    timeRemaining
+    totalQuestions
 }) {
+    const timeRemaining = useQuizStore((state) => state.timeRemaining);
+
     const progress = ((currentQuestion + 1) / totalQuestions) * 100;
     const minutes = Math.floor(timeRemaining / 60);
     const seconds = timeRemaining % 60;

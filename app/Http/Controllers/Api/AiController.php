@@ -57,14 +57,30 @@ class AiController extends Controller
             $optionsText .= "- {$opt}{$isCorrect}\n";
         }
 
+        $studentAnswer = $request->selected_option;
+        $studentContext = "";
+        
+        if ($studentAnswer) {
+            // Determine if student was correct
+            $isStudentCorrect = ($studentAnswer === $question->correct_option);
+            $correctness = $isStudentCorrect ? "Correct" : "Incorrect";
+            $studentContext = "\nThe student answered: \"{$studentAnswer}\" ({$correctness}). Address the student directly.";
+            if (!$isStudentCorrect) {
+                $studentContext .= " Explain why their answer is wrong.";
+            } else {
+                $studentContext .= " Confirm why their answer is correct.";
+            }
+        }
+
         $prompt = "You are an expert tutor. Explain this multiple-choice question clearly and concisely. \n\n" .
                   "Question: {$question->question_text}\n" .
-                  "Options:\n{$optionsText}\n\n" .
+                  "Options:\n{$optionsText}\n" .
+                  $studentContext . "\n\n" .
                   "Explain why the correct answer is right and why others might be wrong. Keep it under 150 words.";
 
         try {
             $response = Http::withHeaders(['Content-Type' => 'application/json'])
-                ->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={$apiKey}", [
+                ->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={$apiKey}", [
                     'contents' => [
                         [
                             'parts' => [

@@ -60,12 +60,28 @@ class QuizController extends Controller
      */
     public function startAttempt(Request $request, $quizId)
     {
-        // ... (unchanged) ...
+        $user = $request->user();
+
+        // Check for existing in-progress attempt
+        $existingAttempt = UserAttempt::where('user_id', $user->id)
+            ->where('quiz_id', $quizId)
+            ->where('status', 'in_progress')
+            ->first();
+
+        if ($existingAttempt) {
+            return response()->json([
+                'attempt_id' => $existingAttempt->id,
+                'started_at' => $existingAttempt->started_at,
+                'max_score' => $existingAttempt->max_score,
+                'resumed' => true // Flag for frontend if needed
+            ], 200);
+        }
+
         $quiz = Quiz::with('questions')->findOrFail($quizId);
         $maxScore = $quiz->questions->sum('points');
 
         $attempt = UserAttempt::create([
-            'user_id' => $request->user()->id,
+            'user_id' => $user->id,
             'quiz_id' => $quizId,
             'max_score' => $maxScore,
             'started_at' => now(),
@@ -87,7 +103,7 @@ class QuizController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'question_id' => 'required|exists:questions,id',
-            'selected_option' => 'required|string', // Changed to string
+            'selected_option' => 'required', // Allow array or string
         ]);
 
         if ($validator->fails()) {
@@ -107,7 +123,14 @@ class QuizController extends Controller
         }
 
         $question = Question::findOrFail($request->question_id);
-        $selectedOption = $request->selected_option;
+        
+        // Handle array or string input
+        $inputOption = $request->selected_option;
+        $selectedOption = is_array($inputOption) ? ($inputOption[0] ?? null) : $inputOption;
+
+        if (!$selectedOption) {
+             return response()->json(['error' => 'No option selected'], 422);
+        }
 
         // Check if answer is correct
         // Simple string comparison
@@ -115,14 +138,15 @@ class QuizController extends Controller
         $pointsEarned = $isCorrect ? $question->points : 0;
 
         // Save the answer
-        UserAnswer::create([
-            'attempt_id' => $attemptId,
-            'question_id' => $request->question_id,
-            'selected_option' => $selectedOption,
-            'is_correct' => $isCorrect,
-            'points_earned' => $pointsEarned,
-            'answered_at' => now(),
-        ]);
+        UserAnswer::updateOrCreate(
+            ['attempt_id' => $attemptId, 'question_id' => $request->question_id],
+            [
+                'selected_option' => $selectedOption,
+                'is_correct' => $isCorrect,
+                'points_earned' => $pointsEarned,
+                'answered_at' => now(),
+            ]
+        );
 
         return response()->json([
             'is_correct' => $isCorrect,
@@ -199,14 +223,12 @@ class QuizController extends Controller
         // Return detailed results with correct answers
         $results = $attempt->answers->map(function ($answer) {
             $question = $answer->question;
-            // $question->options is now just an array of strings ["A", "B"]
-            // $question->correct_option is a string "A"
             
             return [
                 'question_id' => $answer->question_id,
                 'question_text' => $question->question_text,
-                'selected_option' => $answer->selected_option, // String
-                'correct_option' => $question->correct_option, // String
+                'selected_options' => [$answer->selected_option], // Wrap in array
+                'correct_options' => [$question->correct_option], // Wrap in array
                 'is_correct' => $answer->is_correct,
                 'points_earned' => $answer->points_earned,
                 'explanation' => $question->explanation,
@@ -262,7 +284,8 @@ class QuizController extends Controller
     {
         $attempts = UserAttempt::with('quiz:id,title,passing_score')
             ->where('user_id', $request->user()->id)
-            ->orderBy('created_at', 'desc')
+            ->where('status', 'completed') // Only show completed attempts
+            ->orderBy('completed_at', 'desc') // Sort by completion time
             ->paginate(10);
 
         return response()->json($attempts);
@@ -289,8 +312,8 @@ class QuizController extends Controller
             
             return [
                 'question_text' => $question->question_text,
-                'selected_option' => $answer->selected_option,
-                'correct_option' => $question->correct_option,
+                'selected_options' => [$answer->selected_option], // Wrap in array
+                'correct_options' => [$question->correct_option], // Wrap in array
                 'is_correct' => $answer->is_correct,
                 'points_earned' => $answer->points_earned,
                 'explanation' => $question->explanation,
@@ -313,11 +336,29 @@ class QuizController extends Controller
     }
 
     /**
+     * Delete a specific attempt.
+     */
+    public function deleteAttempt(Request $request, $attemptId)
+    {
+        $attempt = UserAttempt::findOrFail($attemptId);
+
+        // Verify ownership
+        if ($attempt->user_id !== $request->user()->id) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $attempt->delete();
+
+        return response()->json(['message' => 'Attempt deleted successfully']);
+    }
+
+    /**
      * Get the leaderboard (Top 10 users by XP).
      */
     public function leaderboard()
     {
         $topUsers = \App\Models\User::select('id', 'name', 'xp', 'level', 'streak_count')
+            ->where('role', '!=', 'admin') // Exclude admin users
             ->orderBy('xp', 'desc')
             ->take(10)
             ->get();

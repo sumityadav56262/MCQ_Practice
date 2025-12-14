@@ -72,6 +72,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/attempts/{id}/answer', [QuizController::class, 'submitAnswer']);
     Route::post('/attempts/{id}/complete', [QuizController::class, 'completeAttempt']);
     Route::get('/my-attempts', [QuizController::class, 'myAttempts']);
+    Route::delete('/attempts/{id}', [QuizController::class, 'deleteAttempt']);
     Route::get('/attempts/{id}', [QuizController::class, 'attemptDetails']);
     Route::get('/leaderboard', [QuizController::class, 'leaderboard']);
     Route::post('/questions/{id}/save', [QuizController::class, 'toggleSaveQuestion']);
@@ -84,7 +85,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Admin Routes
     Route::middleware('admin')->prefix('admin')->group(function () {
         // Existing Admin Routes
-        Route::get('/stats', [AdminController::class, 'getStats']);
+        Route::get('/stats', [ApiAdminController::class, 'getStats']);
         Route::get('/clubs/pending', [AdminController::class, 'getPendingClubs']);
         Route::get('/clubs', [AdminController::class, 'getAllClubs']);
         Route::post('/clubs/{id}/approve', [AdminController::class, 'approveClub']);

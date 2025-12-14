@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Trash2 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import api from '../lib/api';
 
@@ -29,6 +29,21 @@ export function QuizHistory() {
             setAttempts([]);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDelete = async (e, attemptId) => {
+        e.stopPropagation(); // Prevent card click
+        if (!window.confirm('Are you sure you want to delete this attempt? This cannot be undone.')) {
+            return;
+        }
+
+        try {
+            await api.delete(`/attempts/${attemptId}`);
+            setAttempts(prev => prev.filter(a => a.id !== attemptId));
+        } catch (error) {
+            console.error('Failed to delete attempt:', error);
+            alert('Failed to delete attempt');
         }
     };
 
@@ -64,7 +79,7 @@ export function QuizHistory() {
                             <div
                                 key={attempt.id}
                                 onClick={() => navigate(`/results/${attempt.id}`)}
-                                className="bg-white rounded-lg shadow-mobile p-4 cursor-pointer hover:shadow-mobile-lg transition-all active:scale-98"
+                                className="bg-white rounded-lg shadow-mobile p-4 cursor-pointer hover:shadow-mobile-lg transition-all active:scale-98 group"
                             >
                                 <div className="flex items-start justify-between mb-3">
                                     <div className="flex-1">
@@ -73,11 +88,20 @@ export function QuizHistory() {
                                             {new Date(attempt.completed_at).toLocaleDateString()}
                                         </p>
                                     </div>
-                                    {attempt.passed ? (
-                                        <CheckCircle className="w-6 h-6 text-green-600" />
-                                    ) : (
-                                        <XCircle className="w-6 h-6 text-red-600" />
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                        {attempt.passed ? (
+                                            <CheckCircle className="w-6 h-6 text-green-600" />
+                                        ) : (
+                                            <XCircle className="w-6 h-6 text-red-600" />
+                                        )}
+                                        <button
+                                            onClick={(e) => handleDelete(e, attempt.id)}
+                                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                            title="Delete Attempt"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="flex items-center justify-between">
