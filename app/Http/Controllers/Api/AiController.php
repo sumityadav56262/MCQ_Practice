@@ -72,15 +72,15 @@ class AiController extends Controller
             }
         }
 
-        $prompt = "You are an expert tutor. Explain this multiple-choice question clearly and concisely. \n\n" .
+        $prompt = "You are an expert tutor. Explain this question clearly and concisely in a natural, flowing way.\n\n" .
                   "Question: {$question->question_text}\n" .
                   "Options:\n{$optionsText}\n" .
                   $studentContext . "\n\n" .
-                  "Explain why the correct answer is right and why others might be wrong. Keep it under 150 words.";
+                  "Provide a clear explanation in 2-3 short paragraphs. Keep it conversational and under 150 words.";
 
         try {
             $response = Http::withHeaders(['Content-Type' => 'application/json'])
-                ->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={$apiKey}", [
+                ->post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={$apiKey}", [
                     'contents' => [
                         [
                             'parts' => [

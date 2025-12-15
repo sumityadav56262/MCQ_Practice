@@ -8,6 +8,7 @@ import { BottomNavigation } from '../components/BottomNavigation';
 import api from '../lib/api';
 import { Sparkles, CheckCircle, XCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { FormattedAiText } from '../components/FormattedAiText';
 
 export function QuizTaking() {
     const { quizId } = useParams();
@@ -365,24 +366,24 @@ export function QuizTaking() {
                     disabled={submitting}
                 />
 
-                {/* Explanation Section - Moved after buttons */}
+                {/* Explanation Section - Only show if incorrect */}
                 {hasFeedback && (
                     <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-4">
                         <div className={cn(
                             "p-4 rounded-lg border",
-                            currentFeedback.isCorrect ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
+                            currentFeedback.is_correct ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
                         )}>
                             <div className="flex items-center gap-2 mb-2">
-                                {currentFeedback.isCorrect ? (
+                                {currentFeedback.is_correct ? (
                                     <CheckCircle className="w-5 h-5 text-green-600" />
                                 ) : (
                                     <XCircle className="w-5 h-5 text-red-600" />
                                 )}
                                 <span className={cn(
                                     "font-bold",
-                                    currentFeedback.isCorrect ? "text-green-700" : "text-red-700"
+                                    currentFeedback.is_correct ? "text-green-700" : "text-red-700"
                                 )}>
-                                    {currentFeedback.isCorrect ? "Correct!" : "Incorrect"}
+                                    {currentFeedback.is_correct ? "Correct!" : "Incorrect"}
                                 </span>
                             </div>
                             {currentFeedback.explanation && (
@@ -410,13 +411,11 @@ export function QuizTaking() {
                             </button>
                         ) : (
                             <div className="p-4 bg-violet-50 border border-violet-100 rounded-lg animate-in fade-in slide-in-from-bottom-2">
-                                <div className="flex items-center gap-2 mb-2 text-violet-800 font-bold">
+                                <div className="flex items-center gap-2 mb-3 text-violet-800 font-bold">
                                     <Sparkles className="w-5 h-5" />
                                     <span>GyanMitra AI Explanation</span>
                                 </div>
-                                <p className="text-sm text-gray-700 leading-relaxed">
-                                    {aiExplanation}
-                                </p>
+                                <FormattedAiText text={aiExplanation} />
                             </div>
                         )}
                     </div>
