@@ -23,9 +23,14 @@ api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
+            console.warn("401 Unauthorized from:", error.config.url);
             // Unauthorized - clear token and redirect to login
             localStorage.removeItem('auth_token');
-            window.location.href = '/login';
+            // Only redirect if we are NOT already on a public page or guest flow
+            // But we don't know the current route easily here without window.location
+            if (!window.location.pathname.startsWith('/quiz')) {
+                window.location.href = '/login';
+            }
         }
         return Promise.reject(error);
     }

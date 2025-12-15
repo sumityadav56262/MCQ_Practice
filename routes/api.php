@@ -28,9 +28,13 @@ Route::post('/auth/signup/club', [AuthController::class, 'signupClub']);
 // MCQ Public Routes - no authentication required
 Route::get('/quizzes', [QuizController::class, 'index']);
 Route::get('/subjects', [ApiAdminController::class, 'getSubjects']);
+Route::post('/quizzes/check-answer', [QuizController::class, 'checkAnswerStateless']);
+Route::post('/quizzes/check-answers', [QuizController::class, 'checkAnswersStatelessBatch']);
+Route::get('/quizzes/{id}', [QuizController::class, 'show']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
+    Route::post('/auth/change-password', [AuthController::class, 'changePassword']);
 
     // Club Routes
     Route::get('/clubs', [ClubController::class, 'index']);
@@ -67,7 +71,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/notifications/{id}', [NotificationController::class, 'deleteNotification']);
 
     // MCQ Protected Routes - require authentication
-    Route::get('/quizzes/{id}', [QuizController::class, 'show']);
     Route::post('/quizzes/{id}/start', [QuizController::class, 'startAttempt']);
     Route::post('/attempts/{id}/answer', [QuizController::class, 'submitAnswer']);
     Route::post('/attempts/{id}/complete', [QuizController::class, 'completeAttempt']);

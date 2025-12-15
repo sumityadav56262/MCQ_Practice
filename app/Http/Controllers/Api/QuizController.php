@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Quiz;
+use App\Models\Subject;
 use App\Models\Question;
 use App\Models\UserAttempt;
 use App\Models\UserAnswer;
@@ -29,6 +30,15 @@ class QuizController extends Controller
         // Filter by subject
         if ($request->has('subject_id')) {
             $query->where('subject_id', $request->subject_id);
+        } elseif ($request->has('category') || $request->has('subject')) {
+            $slug = $request->input('category') ?? $request->input('subject');
+            $subject = Subject::where('slug', $slug)
+                ->orWhere('name', $slug)
+                ->first();
+
+            if ($subject) {
+                $query->where('subject_id', $subject->id);
+            }
         }
 
         $quizzes = $query->paginate(10);
@@ -413,5 +423,77 @@ class QuizController extends Controller
             ->get();
 
         return response()->json($topics);
+    }
+
+    /**
+     * Stateless answer check for guests (Public).
+     */
+    public function checkAnswerStateless(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'question_id' => 'required|exists:questions,id',
+            'selected_option' => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $question = Question::findOrFail($request->question_id);
+        
+        // Handle array or string input
+        $inputOption = $request->selected_option;
+        $selectedOption = is_array($inputOption) ? ($inputOption[0] ?? null) : $inputOption;
+
+        if (!$selectedOption) {
+             return response()->json(['error' => 'No option selected'], 422);
+        }
+
+        $isCorrect = $selectedOption === $question->correct_option;
+
+        return response()->json([
+            'is_correct' => $isCorrect,
+            'explanation' => $question->explanation,
+            'correct_option' => $question->correct_option,
+        ]);
+    }
+
+    public function checkAnswersStatelessBatch(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'answers' => 'required|array',
+            'answers.*.question_id' => 'required|exists:questions,id',
+            'answers.*.selected_option' => 'required'
+        ]);
+
+        if ($validator->fails()) {
+             return response()->json(['errors' => $validator->errors()], 422);
+        }
+
+        $inputAnswers = $request->input('answers');
+        $questionIds = array_column($inputAnswers, 'question_id');
+        $questions = Question::whereIn('id', $questionIds)->get()->keyBy('id');
+
+        $results = [];
+
+        foreach ($inputAnswers as $ans) {
+            $qId = $ans['question_id'];
+            $question = $questions[$qId] ?? null;
+            if (!$question) continue;
+
+            $inputOption = $ans['selected_option'];
+            $selectedOption = is_array($inputOption) ? ($inputOption[0] ?? null) : $inputOption;
+
+            $isCorrect = $selectedOption == $question->correct_option;
+            
+            $results[$qId] = [
+                'is_correct' => $isCorrect,
+                'explanation' => $question->explanation,
+                'correct_option' => $question->correct_option,
+                'points' => $isCorrect ? ($question->points ?? 1) : 0
+            ];
+        }
+
+        return response()->json($results);
     }
 }

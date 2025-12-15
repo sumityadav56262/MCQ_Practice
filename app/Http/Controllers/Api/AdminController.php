@@ -140,11 +140,16 @@ class AdminController extends Controller
                     ['name' => $subjectName]
                 );
 
+                // Calculate duration if not provided (default 30s per question)
+                $questionCount = count($quizData['questions']);
+                $calculatedDuration = ceil($questionCount * 0.5);
+                $duration = $quizData['duration_minutes'] ?? ($calculatedDuration > 0 ? $calculatedDuration : 30);
+
                 // Create quiz
                 $quiz = Quiz::create([
                     'title' => $quizData['title'],
                     'description' => $quizData['description'] ?? null,
-                    'duration_minutes' => $quizData['duration_minutes'] ?? 30,
+                    'duration_minutes' => $duration,
                     'passing_score' => $quizData['passing_score'] ?? 60,
                     'subject_id' => $subject->id,
                     'difficulty_level' => $quizData['difficulty_level'] ?? 'medium',

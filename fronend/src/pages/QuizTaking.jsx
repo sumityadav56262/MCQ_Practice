@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuizStore } from '../stores/quizStore';
+import { useAuthStore } from '../stores/authStore';
 import { QuestionCard } from '../components/QuestionCard';
 import { QuizProgress } from '../components/QuizProgress';
 import { BottomNavigation } from '../components/BottomNavigation';
@@ -11,8 +12,10 @@ import { cn } from '../lib/utils';
 export function QuizTaking() {
     const { quizId } = useParams();
     const navigate = useNavigate();
+    const { user } = useAuthStore();
     const [mode, setMode] = useState('exam'); // 'exam' or 'practice'
     const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
     const [feedback, setFeedback] = useState({}); // { [questionId]: { isCorrect, explanation, correctOptionIds } }
     const [savedQuestions, setSavedQuestions] = useState(new Set());
 
@@ -20,7 +23,9 @@ export function QuizTaking() {
     const [aiExplanation, setAiExplanation] = useState(null);
     const [loadingAi, setLoadingAi] = useState(false);
 
-    // ... existing hooks ...
+    // Guest Mode State
+    const [guestAnswers, setGuestAnswers] = useState({}); // { [questionId]: { isCorrect, points } }
+
     const {
         currentQuiz,
         questions,
@@ -64,31 +69,54 @@ export function QuizTaking() {
 
 
     const loadQuizAndStart = async () => {
-        // ... (existing load logic) ...
+        setLoading(true);
         try {
-            // Fetch quiz details
+            // Fetch quiz details (Public)
             const quizResponse = await api.get(`/quizzes/${quizId}`);
             const quizData = quizResponse.data;
             setQuiz(quizData, quizData.questions);
 
-            // Start attempt
-            const attemptResponse = await api.post(`/quizzes/${quizId}/start`);
-            setAttempt(attemptResponse.data);
+            if (user) {
+                try {
+                    // Authenticated: Start attempt
+                    const attemptResponse = await api.post(`/quizzes/${quizId}/start`);
+                    setAttempt(attemptResponse.data);
 
-            // Check saved questions
-            const savedResponse = await api.get('/library/saved-questions');
-            const savedIds = new Set(savedResponse.data.data.map(q => q.question_id)); // Assuming structure
-            setSavedQuestions(savedIds);
+                    // Check saved questions
+                    const savedResponse = await api.get('/library/saved-questions');
+                    const savedIds = new Set(savedResponse.data.data.map(q => q.question_id));
+                    setSavedQuestions(savedIds);
+                } catch (authError) {
+                    if (authError.response?.status === 401) {
+                        console.warn("Session expired or invalid, switching to guest mode.");
+                        useAuthStore.getState().logout();
+                        setAttempt(null);
+                    } else {
+                        throw authError; // Re-throw other errors to be caught by outer catch
+                    }
+                }
+            } else {
+                // Guest: No attempt creation
+                setAttempt(null);
+            }
 
             setLoading(false);
         } catch (error) {
             console.error('Failed to load quiz:', error);
-            // alert('Failed to load quiz. Please try again.'); // Commented out to avoid annoyance during dev
-            navigate('/quizzes');
+            // Don't redirect immediately to allow viewing the error in console if needed, 
+            // or show a UI error.
+            alert("Error loading quiz: " + (error.response?.data?.message || error.message));
+            setLoading(false); // Stop loading so we don't stare at a spinner
+            // navigate('/quizzes'); 
         }
     };
 
     const handleExplainWithAi = async () => {
+        if (!user) {
+            setAiExplanation("Please login to use AI features.");
+            return;
+        }
+
         setLoadingAi(true);
         try {
             const currentQuestion = questions[currentQuestionIndex];
@@ -96,23 +124,21 @@ export function QuizTaking() {
 
             const response = await api.post('/ai/explain', {
                 question_id: currentQuestion.id,
-                selected_option: currentAnswers ? currentAnswers[0] : null // Pass first selected option
+                selected_option: currentAnswers ? currentAnswers[0] : null
             });
             setAiExplanation(response.data.explanation);
         } catch (error) {
             console.error("Failed to get AI explanation", error);
-
             if (error.response?.status === 403 || error.response?.status === 503) {
-                setAiExplanation("⚠️ " + (error.response?.data?.message || "Limit reached. Please add your API Key in Profile."));
+                setAiExplanation("⚠️ " + (error.response?.data?.message || "Limit reached."));
             } else {
-                setAiExplanation("Sorry, I couldn't generate an explanation right now. Please try again later.");
+                setAiExplanation("Sorry, I couldn't generate an explanation right now.");
             }
         } finally {
             setLoadingAi(false);
         }
     };
 
-    // ... (handlers) ...
     const handleSelectOption = (optionIds) => {
         const currentQuestion = questions[currentQuestionIndex];
         if (mode === 'practice' && feedback[currentQuestion.id]) return;
@@ -126,14 +152,35 @@ export function QuizTaking() {
         if (!optionIds || optionIds.length === 0) return;
 
         try {
-            const response = await api.post(`/attempts/${attempt.attempt_id}/answer`, {
-                question_id: currentQuestion.id,
-                selected_option: optionIds,
-            });
+            let responseData;
+
+            if (user && attempt) {
+                const response = await api.post(`/attempts/${attempt.attempt_id}/answer`, {
+                    question_id: currentQuestion.id,
+                    selected_option: optionIds,
+                });
+                responseData = response.data;
+            } else {
+                // Guest Stateless Check
+                const response = await api.post(`/quizzes/check-answer`, {
+                    question_id: currentQuestion.id,
+                    selected_option: optionIds,
+                });
+                responseData = response.data;
+
+                // Track guest score locally
+                setGuestAnswers(prev => ({
+                    ...prev,
+                    [currentQuestion.id]: {
+                        isCorrect: responseData.is_correct,
+                        points: responseData.is_correct ? currentQuestion.points : 0
+                    }
+                }));
+            }
 
             setFeedback(prev => ({
                 ...prev,
-                [currentQuestion.id]: response.data
+                [currentQuestion.id]: responseData
             }));
 
         } catch (error) {
@@ -142,6 +189,7 @@ export function QuizTaking() {
     };
 
     const handleBookmark = async () => {
+        if (!user) return; // Guests cannot bookmark
         const currentQuestion = questions[currentQuestionIndex];
         try {
             const response = await api.post(`/questions/${currentQuestion.id}/save`);
@@ -160,35 +208,91 @@ export function QuizTaking() {
     };
 
     const handleSubmitQuiz = async () => {
-        if (!attempt) return;
-
+        setSubmitting(true);
         try {
-            if (mode === 'exam') {
-                for (const [questionId, answers] of selectedAnswers.entries()) {
-                    await api.post(`/attempts/${attempt.attempt_id}/answer`, {
+            if (user && attempt) {
+                if (mode === 'exam') {
+                    for (const [questionId, answers] of selectedAnswers.entries()) {
+                        await api.post(`/attempts/${attempt.attempt_id}/answer`, {
+                            question_id: questionId,
+                            selected_option: answers,
+                        });
+                    }
+                }
+                await api.post(`/attempts/${attempt.attempt_id}/complete`);
+                navigate(`/results/${attempt.attempt_id}`);
+            } else {
+                // Guest Submission Logic
+                if (mode === 'exam') {
+                    const results = {};
+                    let totalScore = 0;
+
+                    // Batch request for speed
+                    const answersPayload = Array.from(selectedAnswers.entries()).map(([questionId, answers]) => ({
                         question_id: questionId,
-                        selected_option: answers, // Changed key
+                        selected_option: answers
+                    }));
+
+                    if (answersPayload.length > 0) {
+                        try {
+                            const response = await api.post('/quizzes/check-answers', { answers: answersPayload });
+                            const batchResults = response.data;
+
+                            // Transform to expected format results structure
+                            Object.entries(batchResults).forEach(([qId, data]) => {
+                                results[qId] = {
+                                    isCorrect: data.is_correct,
+                                    points: data.points,
+                                    explanation: data.explanation,
+                                    correct_option: data.correct_option
+                                };
+                                totalScore += data.points;
+                            });
+
+                        } catch (e) {
+                            console.error("Batch check failed", e);
+                            throw e;
+                        }
+                    }
+
+                    // Navigate to results with state
+                    navigate('/results/guest', {
+                        state: {
+                            quiz: currentQuiz,
+                            questions: questions,
+                            score: totalScore,
+                            max_score: questions.reduce((sum, q) => sum + (q.points || 1), 0),
+                            top_score: 0,
+                            results,
+                            selectedAnswers: Object.fromEntries(selectedAnswers)
+                        }
+                    });
+
+                } else {
+                    // Practice mode - already checked as we went
+                    const totalScore = Object.values(guestAnswers).reduce((sum, a) => sum + a.points, 0);
+                    navigate('/results/guest', {
+                        state: {
+                            quiz: currentQuiz,
+                            questions: questions,
+                            score: totalScore,
+                            max_score: questions.reduce((sum, q) => sum + (q.points || 1), 0),
+                            top_score: 0,
+                            top_score: 0,
+                            // reconstruct results from feedback/guestAnswers
+                            results: feedback,
+                            selectedAnswers: Object.fromEntries(selectedAnswers)
+                        }
                     });
                 }
             }
-
-            await api.post(`/attempts/${attempt.attempt_id}/complete`);
-            navigate(`/results/${attempt.attempt_id}`);
         } catch (error) {
             console.error('Failed to submit quiz:', error);
             alert('Failed to submit quiz. Please try again.');
+        } finally {
+            setSubmitting(false);
         }
     };
-
-    // Watch for time completion separately
-    useEffect(() => {
-        const unsubscribe = useQuizStore.subscribe((state) => {
-            if (state.timeRemaining === 0 && state.attempt) {
-                handleSubmitQuiz();
-            }
-        });
-        return unsubscribe;
-    }, [handleSubmitQuiz]);
 
     if (loading || !currentQuiz || !questions.length) {
         return (
@@ -258,6 +362,7 @@ export function QuizTaking() {
                     // Extra props for practice check
                     onCheck={mode === 'practice' && !currentFeedback ? handleCheckAnswer : undefined}
                     isAnswered={currentAnswers.length > 0}
+                    disabled={submitting}
                 />
 
                 {/* Explanation Section - Moved after buttons */}

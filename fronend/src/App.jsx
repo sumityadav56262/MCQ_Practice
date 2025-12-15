@@ -14,6 +14,7 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { BulkImport } from './pages/BulkImport';
 import { ManageQuizzes } from './pages/ManageQuizzes';
 import { QuizEditor } from './pages/QuizEditor';
+import { ChangePassword } from './pages/ChangePassword';
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/change-password" element={<ChangePassword />} />
 
             {/* New Routes */}
             <Route path="/history" element={<QuizHistory />} />

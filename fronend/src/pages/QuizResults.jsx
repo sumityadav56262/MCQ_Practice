@@ -1,17 +1,26 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle, XCircle, Home } from 'lucide-react';
 import api from '../lib/api';
 
 export function QuizResults() {
     const { attemptId } = useParams();
     const navigate = useNavigate();
+    const location = useLocation(); // Hook to access state
     const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetchResults();
-    }, [attemptId]);
+        if (location.state) {
+            // Guest mode with passing state
+            setResult(location.state);
+            setLoading(false);
+        } else if (attemptId && attemptId !== 'guest') {
+            fetchResults();
+        } else {
+            setLoading(false);
+        }
+    }, [attemptId, location.state]);
 
     const fetchResults = async () => {
         try {
@@ -55,6 +64,7 @@ export function QuizResults() {
                 <div className="bg-white rounded-mobile shadow-mobile-lg p-6 text-center mb-6">
                     <h2 className="text-2xl font-bold text-gray-900 mb-4">{result.quiz.title}</h2>
 
+                    {/* XP Earned - Only for auth users/when present */}
                     {result.xp_earned > 0 && (
                         <div className="mb-4 inline-flex items-center gap-2 px-4 py-1 bg-yellow-100 text-yellow-800 rounded-full font-bold text-sm">
                             <span>+{result.xp_earned} XP Earned!</span>
@@ -62,7 +72,7 @@ export function QuizResults() {
                     )}
 
                     <div className="text-6xl font-bold text-primary-600 mb-2">
-                        {Math.round(result.percentage)}%
+                        {Math.round(result.percentage !== undefined ? result.percentage : (result.score / result.max_score * 100))}%
                     </div>
 
                     <div className="text-sm text-gray-600 mb-4">
@@ -80,7 +90,20 @@ export function QuizResults() {
                 {/* Answer Review */}
                 <h2 className="text-xl font-semibold text-gray-900 mb-4">Answer Review</h2>
                 <div className="space-y-4">
-                    {result.answers.map((answer, index) => (
+                    {/* Handle Guest vs Auth structure */}
+                    {(result.answers || Object.entries(result.results || {}).map(([qId, r]) => {
+                        // Try to find question in passed state questions (guest) or result.questions (if API sends it)
+                        const questionsList = result.questions || location.state?.questions || location.state?.quiz?.questions || [];
+                        const question = questionsList.find(q => q.id === parseInt(qId));
+
+                        return {
+                            question_text: question ? question.question_text : `Question ${qId}`,
+                            is_correct: r.isCorrect,
+                            explanation: r.explanation,
+                            selected_options: result.selectedAnswers[qId] || [],
+                            correct_options: [r.correct_option]
+                        };
+                    })).map((answer, index) => (
                         <div key={index} className="bg-white rounded-mobile p-6">
                             <div className="flex items-start justify-between mb-3">
                                 <span className="text-sm font-medium text-gray-700">

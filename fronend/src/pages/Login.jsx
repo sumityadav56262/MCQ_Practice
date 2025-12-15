@@ -27,7 +27,12 @@ export function Login() {
 
             const { user, token } = response.data;
             login(user, token);
-            navigate('/');
+
+            if (user.role === 'admin') {
+                navigate('/admin');
+            } else {
+                navigate('/');
+            }
         } catch (err) {
             setError(err.response?.data?.message || 'Login failed. Please try again.');
         } finally {
